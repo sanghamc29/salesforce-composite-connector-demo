@@ -157,9 +157,10 @@ var requestPayload = payload.compositeResponse.body.records
 				"type": "Account_841651__c"
 			},
 			// "customExtIdField_c__c": "@{RefAccountForUpdate." ++ "record[" ++ flatten(requestPayload map ((item2, index) -> item2.customExtIdField_c__c find item1))[0] ++ "]" ++".customExtIdField_c__c}",
-			   "customExtIdField_c__c": "@{RefAccountForUpdate.record["++0++"].customExtIdField_c__c}",
-				"Contact_841651__c": vars. varContactId,
-			"Name": "Northern Trail Outfitters-demo-" ++ item1
+			   	"Name": "Northern Trail Outfitters-demo-" ++ item1,
+			   "customExtIdField_c__c": item1 as String,
+				"Contact_841651__c": vars.varContactId
+		
 		})
 	}
 },
