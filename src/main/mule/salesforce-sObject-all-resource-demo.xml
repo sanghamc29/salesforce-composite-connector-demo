@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:salesforce-composite="http://www.mulesoft.org/schema/mule/salesforce-composite" xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core"
+	xmlns:http="http://www.mulesoft.org/schema/mule/http"
+	xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd
+http://www.mulesoft.org/schema/mule/salesforce-composite http://www.mulesoft.org/schema/mule/salesforce-composite/current/mule-salesforce-composite.xsd">
+	<flow name="salesforce-composite-resource-demoFlow-sObjectTree" doc:id="1695236d-293c-4d0e-aeef-800d31e515e3" >
+		<http:listener doc:name="Listener" doc:id="0fbe02fd-97a6-4257-bac9-c0724fa99e74" config-ref="HTTP_Listener_config" path="/demo/sObjectTree" />
+		<ee:transform doc:name="prepare-sobject-tree-request" doc:id="741e7980-9be1-4cb5-b39e-35a733c989d0" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/java
+---
+{
+"records" :[{
+    "attributes" : {"type" : "Account", "referenceId" : "ref1"},
+    "name" : "SampleAccount",
+    "phone" : "1234567890",
+    "website" : "www.salesforce.com",
+    "numberOfEmployees" : "100",
+    "industry" : "Banking",
+    "Contacts" : {
+      "records" : [{
+         "attributes" : {"type" : "Contact", "referenceId" : "ref2"},
+         "lastname" : "Smith",
+         "title" : "President",
+         "email" : "sample@salesforce.com"
+         },{         
+         "attributes" : {"type" : "Contact", "referenceId" : "ref3"},
+         "lastname" : "Evans",
+         "title" : "Vice President",
+         "email" : "sample@salesforce.com"
+         }]
+      }
+    },{
+    "attributes" : {"type" : "Account", "referenceId" : "ref4"},
+    "name" : "SampleAccount2",
+    "phone" : "1234567890",
+    "website" : "www.salesforce2.com",
+    "numberOfEmployees" : "100",
+    "industry" : "Banking"
+     }]
+}]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<salesforce-composite:create-sobject-tree doc:name="Create sobject tree" doc:id="4905fe25-2569-4f4d-94a2-790e825a4781" config-ref="Salesforce_Composite_Config" type="Account">
+			<salesforce-composite:s-objects ><![CDATA[#[payload.records]]]></salesforce-composite:s-objects>
+		</salesforce-composite:create-sobject-tree>
+		<ee:transform doc:name="sfdc-composite-sObjectTree-response" doc:id="9724e688-ef91-4a6c-a61b-4e61a8d167aa" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+payload]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<error-handler >
+			<on-error-propagate enableNotifications="true" logException="true" doc:name="On Error Propagate" doc:id="3608b1e8-6148-4801-bb4c-229226d4fda2" type="ANY" >
+				<ee:transform doc:name="error-from-sobjectTree-execution-request" doc:id="f8e2c0e7-20e2-4508-a5ad-250f2578ec46" >
+					<ee:message >
+						<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+error]]></ee:set-payload>
+					</ee:message>
+				</ee:transform>
+			</on-error-propagate>
+		</error-handler>
+	</flow>
+</mule>

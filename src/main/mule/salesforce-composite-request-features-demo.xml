@@ -1,0 +1,234 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:salesforce-composite="http://www.mulesoft.org/schema/mule/salesforce-composite" xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core"
+	xmlns:http="http://www.mulesoft.org/schema/mule/http"
+	xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd
+http://www.mulesoft.org/schema/mule/salesforce-composite http://www.mulesoft.org/schema/mule/salesforce-composite/current/mule-salesforce-composite.xsd">
+	<salesforce-composite:composite-config name="Salesforce_Composite_Config" doc:name="Salesforce Composite Config" doc:id="f883709d-60a5-49aa-9120-e775a2cde7c4" >
+		<salesforce-composite:oauth-user-pass-connection consumerKey="3MVG9fe4g9fhX0E6pcDU6434xbBaIqlRyHSffRqTiSURdYViXuzmSNMSff4ihUMTQqgrtaou_PhIfbveXkUqH" consumerSecret="F0737CC0743BF22D1D7A7012B4C58AD9E7B1B07EEEC7C9B620E425685B3C9EAC" username="smc123@Test.com" password="Sangha@11931522" securityToken="6VHSoiIxH9FJSkSkWlOfdot6q" tokenEndpoint="https://testcom557-dev-ed.my.salesforce.com/services/oauth2/token" />
+	</salesforce-composite:composite-config>
+	<http:listener-config name="HTTP_Listener_config" doc:name="HTTP Listener config" doc:id="f6517c3d-6337-4ed6-99ae-98529ce5d2b1" >
+		<http:listener-connection host="0.0.0.0" port="8081" />
+	</http:listener-config>
+	<flow name="salesforce-composite-request-features-demoFlow" doc:id="8215024b-92a6-4718-9080-1c98ea8404e0" >
+		<http:listener doc:name="Listener" doc:id="11e4f89b-bcc1-4504-a8be-fc18fed97f66" config-ref="HTTP_Listener_config" path="/demo/compositeReq"/>
+		<set-variable value='#[attributes.queryParams.contactId default ""]' doc:name="get-contact-id-to-update-Details" doc:id="87b01486-164e-4907-9d23-0e85063413e9" variableName="varContactId" />
+		<ee:transform doc:name="get-all-orNone-controller" doc:id="a7250979-28ee-4180-9a7b-e9b8bd46aa75" >
+			<ee:message />
+			<ee:variables >
+				<ee:set-variable variableName="varCompositeAllOrNoneFlag" ><![CDATA[%dw 2.0
+output application/java
+---
+attributes.queryParams.parentCompositeAllOrNoneFlag default false]]></ee:set-variable>
+				<ee:set-variable variableName="varssObjectcollectionAllOrNoneFlag" ><![CDATA[%dw 2.0
+output application/java
+---
+attributes.queryParams.childCompositeAllOrNoneFlag default false]]></ee:set-variable>
+			</ee:variables>
+		</ee:transform>
+		<salesforce-composite:pre-query doc:name="Pre-query-dynamic-get-url- to-fetch-all-parent-accounts-for-requested-contactId" doc:id="bf1a4944-8798-4035-84b4-55a13c7396dd" config-ref="Salesforce_Composite_Config" >
+			<salesforce-composite:query ><![CDATA[select customExtIdField_c__c from Account_841651__c where Contact_841651__c = :pUpdateContactId]]></salesforce-composite:query>
+			<salesforce-composite:parameters ><![CDATA[#[output application/java
+---
+{
+	pUpdateContactId : attributes.queryParams.contactId
+}]]]></salesforce-composite:parameters>
+		</salesforce-composite:pre-query>
+		<ee:transform doc:name="initialize dunamic GET url" doc:id="53d581ab-16af-420b-b0f1-3b49cda12348" >
+			<ee:message />
+			<ee:variables >
+				<ee:set-variable variableName="dynamicGetURL" ><![CDATA[%dw 2.0
+import * from dw::core::Strings
+output application/json
+var substring1 = substringBefore(payload.url, "+%3D")
+var substring2 = substringAfter(payload.url, "%3D+")
+---
+"/services/data/" ++ substring1 ++ "='" ++ substring2 ++"'"]]></ee:set-variable>
+			</ee:variables>
+		</ee:transform>
+		<salesforce-composite:execute-composite-request doc:name="Execute composite request - GET" doc:id="6e28b71c-a51a-4675-895c-ef799bcbacaf" config-ref="Salesforce_Composite_Config">
+			<salesforce-composite:request-body ><![CDATA[#[%dw 2.0
+output application/json
+---
+{
+
+
+	"compositeRequest": [
+		{
+		"method": "GET",
+		
+		"url": vars.dynamicGetURL,
+		"referenceId": "RefAccountForUpdate"
+	}]}]]]></salesforce-composite:request-body>
+		</salesforce-composite:execute-composite-request>
+<logger level="INFO" doc:name="Logger" doc:id="ab98c32b-1f1c-4e26-a4f9-e66ca44a0933" message="#[%dw 2.0&#10;output application/json&#10;---&#10;payload.compositeResponse.body.records map ((item, index) -&gt;  {&#10;	accountList: item.customExtIdField_c__c&#10;})]"/>
+		<!-- [STUDIO:"prepare-composite request-with-dependent-sObjectCollection-modified"]		<ee:transform doc:name="prepare-composite request-with-dependent-sObjectCollection-modified" doc:id="eff987fc-3b88-4e28-8c2a-d7d3be102fd6" >
+			<ee:message >
+			</ee:message>
+			<ee:variables >
+				<ee:set-variable variableName="compositeRequest" ><![CDATA[%dw 2.0
+output application/json
+var totalNumberOfAccounts = payload.compositeResponse.body.records map ((item, index) ->  {
+	accountList: item.customExtIdField_c__c
+})
+var accountList = totalNumberOfAccounts.accountList[0]
+var requestPayload = payload.compositeResponse.body.records
+&#45;&#45;-
+{
+	"allOrNone": vars.varCompositeAllOrNoneFlag,
+	//"collateSubrequests": false,
+	"compositeRequest": [
+		{
+		"method": "GET",
+	
+		"url": vars.dynamicGetURL,
+		"referenceId": "RefAccountForUpdate",
+		
+	},
+	{
+      "method": "PATCH",
+      "url": "/services/data/v58.0/composite/sobjects/Account_841651__c/customExtIdField_c__c",
+      "referenceId": "updatedAccount",
+      "body": {
+        "allOrNone": true,
+        "records": [
+          {
+            "attributes": {
+              "type": "Account_841651__c"
+            },
+            "Name": "Northern Trail Outfitters - @{RefAccountForUpdate.records[0].customExtIdField_c__c}",
+            "customExtIdField_c__c": "@{RefAccountForUpdate.records[0].customExtIdField_c__c}",
+            "Contact_841651__c": vars.varContactId
+          }
+          ]
+          
+       } 
+       
+       
+       },
+	
+	{
+      "method": "POST",
+      "url": "/services/data/v60.0/sobjects/Lead_841651__c",
+   
+      "body": {
+        "Name": "Custom-Lead-841651",
+        "Email__c": "test-" ++ randomInt(100) ++"@gmail.com",
+        "Phone__c": "7037571000"
+      },
+         "referenceId": "newLead"
+    }
+	
+	]
+}]]></ee:set-variable>
+			</ee:variables>
+		</ee:transform> [STUDIO] -->
+		<ee:transform doc:name="Transform Message" doc:id="88a59705-0c99-4aa4-8b38-fbeec631625a" >
+			<ee:message >
+			</ee:message>
+			<ee:variables >
+				<ee:set-variable variableName="compositeRequest" ><![CDATA[%dw 2.0
+output application/json
+var totalNumberOfAccounts = payload.compositeResponse.body.records map ((item, index) ->  {
+	accountList: item.customExtIdField_c__c
+})
+var accountList = totalNumberOfAccounts.accountList[0]
+var requestPayload = payload.compositeResponse.body.records
+---
+{
+	"allOrNone": vars.varCompositeAllOrNoneFlag,
+	// "collateSubrequests": false,
+			"compositeRequest": [{
+		"method": "GET",
+		"url": vars.dynamicGetURL,
+		"referenceId": "RefAccountForUpdate",
+	},
+	{
+		"method": "PATCH",
+		"url": "/services/data/v58.0/composite/sobjects/Account_841651__c/customExtIdField_c__c",
+		"referenceId": "updatedAccount",
+		"body": {
+			"allOrNone": true,
+			"records": accountList map ((item1, index) -> 
+            	{
+				"attributes": {
+				"type": "Account_841651__c"
+			},
+			// "customExtIdField_c__c": "@{RefAccountForUpdate." ++ "record[" ++ flatten(requestPayload map ((item2, index) -> item2.customExtIdField_c__c find item1))[0] ++ "]" ++".customExtIdField_c__c}",
+			   "customExtIdField_c__c": "@{RefAccountForUpdate.record["++0++"].customExtIdField_c__c}",
+				"Contact_841651__c": vars. varContactId,
+			"Name": "Northern Trail Outfitters-demo-" ++ item1
+		})
+	}
+},
+	
+	{
+		"method": "POST",
+		"url": "/services/data/v60.0/sobjects/Lead_841651__c",
+		"body": {
+			"Name": "Custom-Lead-841651",
+			"Email__c": "test-" ++ randomInt(100) ++"@gmail.com",
+			"Phone__c": "7037571000"
+		},
+		"referenceId": "newLead"
+	}]
+}]]></ee:set-variable>
+			</ee:variables>
+		</ee:transform>
+		<salesforce-composite:execute-composite-request doc:name="Execute composite request" doc:id="22b7d36f-df57-44c6-8f18-2e352ecc3ef8" config-ref="Salesforce_Composite_Config">
+			<salesforce-composite:request-body ><![CDATA[#[vars.compositeRequest]]]></salesforce-composite:request-body>
+		</salesforce-composite:execute-composite-request>
+		<ee:transform doc:name="sfdc-composite-response" doc:id="59a7755b-7774-4502-9936-6b0b82e3e162" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+payload]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<ee:transform doc:name="prepare-composite request-with-dependent-sObjectCollection-modified" doc:id="1dd88fae-f6e8-493a-8c89-eb276015cb0f" >
+			<ee:message />
+			<ee:variables >
+				<ee:set-variable variableName="compositeRequest" ><![CDATA[%dw 2.0
+output application/json
+var totalNumberOfAccounts = payload.compositeResponse.body.records map ((item, index) ->  {
+	accountList: item.customExtIdField_c__c
+})
+var accountList = totalNumberOfAccounts.accountList[0]
+var requestPayload = payload.compositeResponse.body.records
+---
+{
+	"allOrNone": vars.varCompositeAllOrNoneFlag,
+	"collateSubrequests": false,
+	"compositeRequest": [{
+		"method": "GET",
+		"referenceId": "RefAccountForUpdate",
+		"url": vars.dynamicGetURL
+	},
+		
+		
+	
+	{
+		"method": "PATCH",
+		"url": "/services/data/v58.0/composite/sobjects/Account_841651__c/customExtIdField_c__c",
+		"referenceId": "updatedAccount",
+		"body": {
+			"allOrNone": true,
+			"records": accountList map ((item1, index) -> 
+            	{
+				"attributes": {
+					"type": "Account_841651__c"
+				},
+				"Name": "Northern Trail Outfitters" ++ item1,
+				"customExtIdField_c__c": "@{RefAccountForUpdate." ++ "record[" ++ flatten(requestPayload map ((item2, index) -> item2.customExtIdField_c__c find item1))[0] ++ "]" ++".customExtIdField_c__c}",
+				"Contact_841651__c": vars.varContactId
+			})
+		}
+	}]
+}]]></ee:set-variable>
+			</ee:variables>
+		</ee:transform>
+	</flow>
+</mule>
