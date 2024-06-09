@@ -64,7 +64,7 @@ output application/json
 	}]}]]]></salesforce-composite:request-body>
 		</salesforce-composite:execute-composite-request>
 <logger level="INFO" doc:name="Logger" doc:id="ab98c32b-1f1c-4e26-a4f9-e66ca44a0933" message="#[%dw 2.0&#10;output application/json&#10;---&#10;payload.compositeResponse.body.records map ((item, index) -&gt;  {&#10;	accountList: item.customExtIdField_c__c&#10;})]"/>
-		<!-- [STUDIO:"prepare-composite request-with-dependent-sObjectCollection-modified"]		<ee:transform doc:name="prepare-composite request-with-dependent-sObjectCollection-modified" doc:id="eff987fc-3b88-4e28-8c2a-d7d3be102fd6" >
+<!-- [STUDIO:"prepare-composite request-with-dependent-sObjectCollection-modified"]				<ee:transform doc:name="prepare-composite request-with-dependent-sObjectCollection-modified" doc:id="eff987fc-3b88-4e28-8c2a-d7d3be102fd6" >
 			<ee:message >
 			</ee:message>
 			<ee:variables >
@@ -125,7 +125,7 @@ var requestPayload = payload.compositeResponse.body.records
 }]]></ee:set-variable>
 			</ee:variables>
 		</ee:transform> [STUDIO] -->
-		<ee:transform doc:name="Transform Message" doc:id="88a59705-0c99-4aa4-8b38-fbeec631625a" >
+		<ee:transform doc:name="prepare-composite request-with-dependent-query-sObject" doc:id="88a59705-0c99-4aa4-8b38-fbeec631625a" >
 			<ee:message >
 			</ee:message>
 			<ee:variables >
@@ -140,7 +140,8 @@ var requestPayload = payload.compositeResponse.body.records
 {
 	"allOrNone": vars.varCompositeAllOrNoneFlag,
 	// "collateSubrequests": false,
-			"compositeRequest": [{
+	
+	"compositeRequest": [{
 		"method": "GET",
 		"url": vars.dynamicGetURL,
 		"referenceId": "RefAccountForUpdate",
@@ -150,31 +151,36 @@ var requestPayload = payload.compositeResponse.body.records
 		"url": "/services/data/v58.0/composite/sobjects/Account_841651__c/customExtIdField_c__c",
 		"referenceId": "updatedAccount",
 		"body": {
-			"allOrNone": true,
+			"allOrNone": vars.varssObjectcollectionAllOrNoneFlag,
 			"records": accountList map ((item1, index) -> 
             	{
 				"attributes": {
 				"type": "Account_841651__c"
 			},
 			// "customExtIdField_c__c": "@{RefAccountForUpdate." ++ "record[" ++ flatten(requestPayload map ((item2, index) -> item2.customExtIdField_c__c find item1))[0] ++ "]" ++".customExtIdField_c__c}",
-			   	"Name": "Northern Trail Outfitters-demo-" ++ item1,
-			   "customExtIdField_c__c": item1 as String,
+			   	"Name": if(!isEmpty(item1))"Northern Trail Outfitters-demo-" ++ item1 else "Northern Trail Outfitters-demo-default",
+			   "customExtIdField_c__c": if(!isEmpty(item1))(item1 as String) else "123",
 				"Contact_841651__c": vars.varContactId
 		
 		})
 	}
 },
 	
-	{
-		"method": "POST",
-		"url": "/services/data/v60.0/sobjects/Lead_841651__c",
-		"body": {
-			"Name": "Custom-Lead-841651",
-			"Email__c": "test-" ++ randomInt(100) ++"@gmail.com",
-			"Phone__c": "7037571000"
-		},
-		"referenceId": "newLead"
-	}]
+	
+		{
+      "method": "POST",
+      "url": "/services/data/v58.0/composite/sobjects/Lead_841651__c",
+      "referenceId": "newLead",
+      "body": {
+      	"allOrNone": vars.varssObjectcollectionAllOrNoneFlag,
+      	
+        "Name": "Custom-Lead-841651",
+        "Email__c": "test-"++ randomInt(1000)++"@gmail.com",
+        "Phone__c": "7037571000",
+        "PartnerAccountId__c" : "a055g000007j2RoAAI"
+        
+      }
+    }]
 }]]></ee:set-variable>
 			</ee:variables>
 		</ee:transform>
@@ -188,48 +194,6 @@ output application/json
 ---
 payload]]></ee:set-payload>
 			</ee:message>
-		</ee:transform>
-		<ee:transform doc:name="prepare-composite request-with-dependent-sObjectCollection-modified" doc:id="1dd88fae-f6e8-493a-8c89-eb276015cb0f" >
-			<ee:message />
-			<ee:variables >
-				<ee:set-variable variableName="compositeRequest" ><![CDATA[%dw 2.0
-output application/json
-var totalNumberOfAccounts = payload.compositeResponse.body.records map ((item, index) ->  {
-	accountList: item.customExtIdField_c__c
-})
-var accountList = totalNumberOfAccounts.accountList[0]
-var requestPayload = payload.compositeResponse.body.records
----
-{
-	"allOrNone": vars.varCompositeAllOrNoneFlag,
-	"collateSubrequests": false,
-	"compositeRequest": [{
-		"method": "GET",
-		"referenceId": "RefAccountForUpdate",
-		"url": vars.dynamicGetURL
-	},
-		
-		
-	
-	{
-		"method": "PATCH",
-		"url": "/services/data/v58.0/composite/sobjects/Account_841651__c/customExtIdField_c__c",
-		"referenceId": "updatedAccount",
-		"body": {
-			"allOrNone": true,
-			"records": accountList map ((item1, index) -> 
-            	{
-				"attributes": {
-					"type": "Account_841651__c"
-				},
-				"Name": "Northern Trail Outfitters" ++ item1,
-				"customExtIdField_c__c": "@{RefAccountForUpdate." ++ "record[" ++ flatten(requestPayload map ((item2, index) -> item2.customExtIdField_c__c find item1))[0] ++ "]" ++".customExtIdField_c__c}",
-				"Contact_841651__c": vars.varContactId
-			})
-		}
-	}]
-}]]></ee:set-variable>
-			</ee:variables>
 		</ee:transform>
 	</flow>
 </mule>
