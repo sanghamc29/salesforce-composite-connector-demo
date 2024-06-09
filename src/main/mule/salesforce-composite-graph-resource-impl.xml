@@ -1,0 +1,119 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:salesforce-composite="http://www.mulesoft.org/schema/mule/salesforce-composite" xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core"
+	xmlns:http="http://www.mulesoft.org/schema/mule/http"
+	xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd
+http://www.mulesoft.org/schema/mule/salesforce-composite http://www.mulesoft.org/schema/mule/salesforce-composite/current/mule-salesforce-composite.xsd">
+	<salesforce-composite:composite-config name="Salesforce_Composite_Config" doc:name="Salesforce Composite Config" doc:id="62782360-1152-40d1-a7cf-03e1bd3f45b9" >
+		<salesforce-composite:oauth-user-pass-connection consumerKey="3MVG9fe4g9fhX0E6pcDU6434xbBaIqlRyHSffRqTiSURdYViXuzmSNMSff4ihUMTQqgrtaou_PhIfbveXkUqH" consumerSecret="F0737CC0743BF22D1D7A7012B4C58AD9E7B1B07EEEC7C9B620E425685B3C9EAC" username="smc123@Test.com" password="Sangha@11931522" securityToken="6VHSoiIxH9FJSkSkWlOfdot6q" tokenEndpoint="https://testcom557-dev-ed.my.salesforce.com/services/oauth2/token" />
+	</salesforce-composite:composite-config>
+	<http:listener-config name="HTTP_Listener_config" doc:name="HTTP Listener config" doc:id="8b36c966-eb05-43fa-aca7-7bcaf96a4afa" >
+		<http:listener-connection host="0.0.0.0" port="8081" />
+	</http:listener-config>
+	<flow name="salesforce-composite-graph-request-features-demoFlow" doc:id="8bebf8c2-3dd6-439c-87f6-93e19836857c" >
+		<http:listener doc:name="Listener" doc:id="fc80c8bf-ebf6-49a6-ac26-3a3762ec2f15" config-ref="HTTP_Listener_config" path="/demo/compositeGraphReq"/>
+<logger level="INFO" doc:name="Logger" doc:id="e9e2212c-269f-400a-9e89-6f4e3040747b" message="#[%dw 2.0&#10;output application/json&#10;---&#10;payload.compositeResponse.body.records map ((item, index) -&gt;  {&#10;	accountList: item.customExtIdField_c__c&#10;})]"/>
+		<ee:transform doc:name="prepare-composite graph-request" doc:id="a9aae8ab-6bcf-4f75-b81f-5bf082a5dbbe" >
+			<ee:message >
+			</ee:message>
+			<ee:variables >
+				<ee:set-variable variableName="compositeRequest" ><![CDATA[%dw 2.0
+output application/java
+---
+{
+	"graphs": payload.brokers map ((broker, indexOfBroker) -> {
+		"graphId": indexOfBroker + 1,
+		"compositeRequest": [{
+			"url": "/services/data/v54.0/sobjects/Account/BR_ID__c/" ++ broker.brokerId,
+			"body": {
+				"name": broker.name,
+				"ShippingCity": broker.address.city default "",
+				"ShippingState": broker.address.state default "",
+				"ShippingCountry": broker.address.country default "",
+				"Company_email__c": broker.email,
+				"Phone": broker.phone,
+			},
+			"method": "PATCH",
+			"referenceId": "reference_id_broker_" ++ (indexOfBroker + 1) as String
+		}] ++
+    (broker.adviserIds flatMap ((advisor, indexOfAdviser) -> [{
+			"url": "/services/data/v54.0/sobjects/Account/BR_ID__c/" ++ trim(advisor),
+			"body": {
+				"firstname": "Zerodha",
+				"lastname": "Advisor",
+			},
+			"method": "PATCH",
+			"referenceId": "reference_id__broker_" ++ (indexOfBroker + 1) ++ "_advisor_" ++ (indexOfAdviser + 1) as String
+		},
+      {
+			"url": "/services/data/v54.0/sobjects/AccountAccountRelation__c/Account_Relationship_Identifier__c/" ++ broker.brokerId,
+			"body": {
+				"Service_Account__c": "@{reference_id_broker_" ++ (indexOfBroker + 1) ++ ".id}" as String,
+				"Service_RelatedAccount__c": "@{reference_id__broker_" ++ (indexOfBroker + 1) ++ "_advisor_" ++ (indexOfAdviser + 1) ++ ".id}" as String,
+				"Service_Role__c": "",
+				"Service_Active__c": true
+			},
+			"method": "PATCH",
+			"referenceId": "reference_id_relation_broker_" ++ (indexOfBroker + 1) ++ "_adviser_" ++ (indexOfAdviser + 1) as String
+		}]))
+	})
+}]]></ee:set-variable>
+			</ee:variables>
+		</ee:transform>
+		<salesforce-composite:execute-composite-request doc:name="Execute composite request" doc:id="ffd02d38-beac-49fb-bd49-c5d79fb9d270" config-ref="Salesforce_Composite_Config">
+			<salesforce-composite:request-body ><![CDATA[#[vars.compositeRequest]]]></salesforce-composite:request-body>
+		</salesforce-composite:execute-composite-request>
+		<ee:transform doc:name="sfdc-composite-response" doc:id="e00c3c79-c3a4-4b53-b5be-2848c3204abf" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+payload]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<ee:transform doc:name="prepare-composite request-with-dependent-sObjectCollection-modified" doc:id="b4d14ff6-8935-4c8d-8d03-ca4f38418e7a" >
+			<ee:message />
+			<ee:variables >
+				<ee:set-variable variableName="compositeRequest" ><![CDATA[%dw 2.0
+output application/json
+var totalNumberOfAccounts = payload.compositeResponse.body.records map ((item, index) ->  {
+	accountList: item.customExtIdField_c__c
+})
+var accountList = totalNumberOfAccounts.accountList[0]
+var requestPayload = payload.compositeResponse.body.records
+---
+{
+	"allOrNone": vars.varCompositeAllOrNoneFlag,
+	"collateSubrequests": false,
+	"compositeRequest": [{
+		"method": "GET",
+		"referenceId": "RefAccountForUpdate",
+		"url": vars.dynamicGetURL
+	},
+		
+		
+	
+	{
+		"method": "PATCH",
+		"url": "/services/data/v58.0/composite/sobjects/Account_841651__c/customExtIdField_c__c",
+		"referenceId": "updatedAccount",
+		"body": {
+			"allOrNone": true,
+			"records": accountList map ((item1, index) -> 
+            	{
+				"attributes": {
+					"type": "Account_841651__c"
+				},
+				"Name": "Northern Trail Outfitters" ++ item1,
+				"customExtIdField_c__c": "@{RefAccountForUpdate." ++ "record[" ++ flatten(requestPayload map ((item2, index) -> item2.customExtIdField_c__c find item1))[0] ++ "]" ++".customExtIdField_c__c}",
+				"Contact_841651__c": vars.varContactId
+			})
+		}
+	}]
+}]]></ee:set-variable>
+			</ee:variables>
+		</ee:transform>
+	</flow>
+</mule>
