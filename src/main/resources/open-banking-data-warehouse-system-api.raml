@@ -1,0 +1,348 @@
+#%RAML 1.0
+title: Open Banking Data Warehouse System API
+description: System API Connecting to PCCU Data Warehouse for Open Banking
+protocols: [HTTPS]
+mediaType: application/json
+version: v1
+
+uses:
+  standards-library: exchange_modules/1b8ca19c-a83f-4354-8fdd-d7b7bb094a7b/pccu-standards-library/1.0.21/pccu-standards-library.raml
+
+/banking:
+  /products:
+    displayName: Open Banking Products
+    get:
+      queryParameters:
+        version:
+          type: integer
+          example: 2
+          description: Open Banking Version
+      displayName: GET Products
+      description: Get Products from Data Warehouse
+      is: [standards-library.clientIdEnforcement, standards-library.genericErrorResponse]
+      responses:
+        200:
+          description: returns list of products
+          body:
+            example: !include examples/get-products-response-example.json
+    /{product-id}:
+      displayName: Open Banking Product Detail
+      get:
+        queryParameters:
+          version:
+            type: integer
+            example: 2
+            description: Open Banking Version
+        displayName: GET Product Details
+        description: Get Product Details from Data Warehouse
+        is: [standards-library.clientIdEnforcement, standards-library.genericErrorResponse]
+        responses:
+          200:
+            description: returns product details
+            body:
+              example: !include examples/get-product-details-response-example.json
+    
+    /core-banking-products:
+      displayName: Core Banking Products
+      get:
+        queryParameters:
+          version:
+            type: integer
+            example: 2
+            description: Open Banking Version
+        displayName: GET Core Core Banking Product and Open Banking linkage
+        description: Retrieve Core Banking Product and Open Banking linkage
+        is: [standards-library.clientIdEnforcement, standards-library.genericErrorResponse]
+        responses:
+          200:
+            description: returns product linkage details
+            body:
+              example: !include examples/get-core-banking-product-linkage-response-example.json
+  /accounts:
+    /core-banking-accounts:
+      displayName: Core Banking Account Details
+      get:
+        queryParameters:
+          account-id-set:
+            type: string
+            example: "82139213,12312390"
+            description: Comma separated account ids to be retrieved
+        displayName: GET Core Banking Account Details
+        description: Retrieve Account Details that cannot be obtained from Core Banking XML Communicator
+        is: [standards-library.clientIdEnforcement, standards-library.genericErrorResponse]
+        responses:
+          200:
+            description: List of account details
+            body:
+              example: !include examples/get-core-banking-account-details-response-example.json
+    /{account-id}:
+      uriParameters:
+          account-id:
+            displayName: Account ID
+            type: string
+      /transactions:
+        displayName: Transactions
+        get:
+          displayName: Get Transaction for Account
+          description: Retrieves Transactions for a given account id
+          is: [standards-library.clientIdEnforcement, standards-library.genericErrorResponse]
+          queryParameters:
+            page:
+              description: Page of results to request (standard pagination)
+              required: false
+              default: 1
+              type: integer
+            page-size:
+              description: Page size to request. Default is 25 (standard pagination)
+              required: false
+              default: 25
+              type: integer
+            oldest-time:
+              description: Constrain the transaction history request to transactions with effective time at or after this date/time. If absent defaults to newest-time minus 90 days.  Format is aligned to DateTimeString common type
+              required: false
+              type: string
+            newest-time:
+              description: Constrain the transaction history request to transactions with effective time at or before this date/time.  If absent defaults to today.  Format is aligned to DateTimeString common type
+              required: false
+              type: string
+            min-amount:
+              description: Filter transactions to only transactions with amounts higher or equal to than this amount
+              required: false
+              type: string
+            max-amount:
+              description: Filter transactions to only transactions with amounts less than or equal to than this amount
+              required: false
+              type: string
+            text:
+              description: Filter transactions to only transactions where this string value is found as a substring of either the reference or description fields. Format is arbitrary ASCII string. This parameter is optionally implemented by data holders. If it is not implemented then a response should be provided as normal without text filtering applied and an additional boolean field named isQueryParamUnsupported should be included in the meta object and set to true (whether the text parameter is supplied or not)
+              required: false
+              type: string
+          responses:
+            200:
+              description: Returns list of transactions for an account
+              body:
+                example: !include examples/get-transactions-response.json
+
+        /{transaction-id}:
+          uriParameters:
+            transaction-id:
+              displayName: Transaction ID
+              description: Unique ID for the Transaction
+              type: string
+          get:
+            displayName: Get Transaction Details
+            description: Retrieves Transaction Details by using the transaction ID from Data Warehouse
+            is: [standards-library.clientIdEnforcement, standards-library.genericErrorResponse]
+            responses:
+              200:
+                body:
+                  example: !include examples/get-transaction-details-response.json
+  /members:
+    /{member-id}:
+      uriParameters:
+        member-id:
+          displayName: Member Id
+          type: string
+      /accounts:
+        get:
+          displayName: Open Banking Get Eligible Accounts
+          description: Retrieve Account Summary for All Eligible Eligible Accounts that can be shared with Open Banking
+          queryParameters:
+            accounts:
+              type: string
+              description: From the ADR (Accreditable Data Recipient) Experience layer, a list 	of Accounts to be passed to the Account Management Process layer to fetch the 	summary details. These accounts are parsed from the basiqToken info being 	passed as a queryParameters in the ADR layer.
+
+            productCategory:
+              type: string
+              description : Used to filter results on the product Category field applicable to accounts. Any one of the valid values for this field can be supplied. For absent/default, all accounts returned.  
+            
+            productIdentifiers:
+               type: string
+               description : A Comma Seperated List of [SubsystemCode-OpenBankingProductID] Products based on the Product Category received in the ADR   Request. 
+
+            accountStatus:
+              type: string
+              description: Used to filter results according to open/closed status. Values can be OPEN, CLOSED or ALL. If absent or default, then ALL is assumed
+
+            page:
+              type: number
+              description: age of results to request (standard pagination)
+
+            pageSize:
+              type: number
+              description: Page size to request. Default is 25 (standard pagination)  
+
+          is: [standards-library.clientIdEnforcement, standards-library.genericErrorResponse]
+          responses:
+            200:
+              description: Retrieve Account Summary for All Eligible Eligible Accounts that can be shared with Open Banking
+              body:
+                type: !include data-types/get-banking-eligible-accounts-response.raml
+                example: !include examples/get-banking-eligible-accounts-response.json
+
+        /{account-id}:
+            uriParameters:
+              account-id:
+                displayName: Account ID
+                type: string
+            get:
+              displayName: Open Banking Get Account Details - Details with Features - Fees - Lending Rates -Deposit Rates for a specific accountId
+              description: Open Banking Get Account Details - Details with Features - Fees - Lending Rates -Deposit Rates for a specific accountId
+              is: [standards-library.clientIdEnforcement, standards-library.genericErrorResponse]
+              responses:
+                200:
+                  description: Returns  Details with Features - Fees - Lending Rates -Deposit Rates for a specific accountId for a Specific Account
+                  body:
+                    example: !include examples/get-banking-eligible-accounts-details-response.json
+
+
+        /{account-type}:
+          uriParameters:
+            account-type:
+              displayName: Account Type
+              type: string
+              enum: ["demand-deposit", "loan", "term-deposit"]
+          /{account-id}:
+            uriParameters:
+              account-id:
+                displayName: Account ID
+                type: string
+            get:
+              displayName: Open Banking Get Account Details - Lending Rate
+              description: Retrieve Account Details for an Account from Data Warehouse
+              is: [standards-library.clientIdEnforcement, standards-library.genericErrorResponse]
+              responses:
+                200:
+                  description: Returns Account Details for a Specific Account
+                  body:
+                    example: !include examples/get-account-details.json
+
+      /payees:
+        get:
+          displayName: Open Banking Get Payees
+          description: Retrieve the list of Payees of a given member
+          is: [standards-library.clientIdEnforcement, standards-library.genericErrorResponse]
+          queryParameters:
+            payee-type?:
+              description: "The type of Payee to return, this will be one of the following: ALL, BILLER, DIGITAL_WALLET, DOMESTIC, INTERNATIONAL (default to ALL if not supplied)"
+              default: ALL
+              type: string
+              enum: 
+              - ALL
+              - BILLER
+              - DIGITAL_WALLET
+              - DOMESTIC
+              - INTERNATIONAL
+            page?:
+              description: Page of results to request (standard pagination)
+              default: 1
+              type: integer
+            page-size?:
+              description: Page size to request. Default is 25 (standard pagination)
+              default: 25
+              type: integer
+          responses:
+            200:
+              description: Returns list of payees of a given member
+              body:
+                example: !include examples/get-payees-response.json
+        /{payee-id}:
+          uriParameters:
+            payee-id:
+              type: string
+              description: The Payee Id of a Payee to be able to obtain its Payee Details
+          get:
+            displayName: Open Banking Get Payee Details
+            description: Retrieves Details of a given Payee
+            is: [standards-library.clientIdEnforcement, standards-library.genericErrorResponse]
+            responses:
+              200:
+                description: Returns the information of a given payee id
+                body:
+                  application/json:
+                    type: !include data-types/get-payee-details-response.raml
+                    examples:
+                      DOMESTIC_ACCOUNT: !include examples/get-payee-details-domestic-account-response.json 
+                      DOMESTIC_CARD: !include examples/get-payee-details-domestic-card-response.json
+                      DOMESTIC_PAYID: !include examples/get-payee-details-domestic-payid-response.json
+                      BILLER: !include examples/get-payee-details-biller-response.json
+                      INTERNATIONAL: !include examples/get-payee-details-international-response.json
+                      DIGITAL_WALLET: !include examples/get-payee-details-digital-wallet-response.json
+                  
+/vulnerable-members:
+  get:
+    displayName: GET Vulnerable Members
+    description: Get Vulnerable Members from Data Warehouse
+    is: [standards-library.clientIdEnforcement, standards-library.genericErrorResponse]
+    responses:
+      200:
+        description: Returns list of IDs of vulnerable members
+        body:
+          example: !include examples/get-vulnerable-members-response-example.json
+  /{vulnerable-member-id}:
+    get:
+      displayName: GET Vulnerable Member Details
+      description: Get Vulnerable Member Details from Data Warehouse
+      is: [standards-library.clientIdEnforcement, standards-library.genericErrorResponse]
+      responses:
+        200:
+          description: Returns details of of vulnerable member
+          body:
+            example: !include examples/get-vulnerable-member-details-response-example.json
+            
+/members:
+  /{member-id}:
+    uriParameters:
+      member-id:
+        displayName: Member Id
+        description: Personal Member ID for Get Eligible Accounts and Get Secondary Users, Use Business Member Id for Business Representatives
+        type: string
+    get:
+      displayName: Open Banking Get Member Details - Get Eligible Member Check
+      description: Retrieve Member Details for a member Id from Data Warehouse - Checks if a member is eligible for Open Banking
+      is: [standards-library.clientIdEnforcement, standards-library.genericErrorResponse]
+      responses:
+        200:
+          description: Returns Member Details if a Member is Eligible
+          body:
+            example: !include examples/get-eligible-member-details.json
+    /accounts:
+      get:
+        displayName: Open Banking Get Eligible Accounts
+        description: Retrieve Eligible Accounts that can be shared with Open Banking
+        is: [standards-library.clientIdEnforcement, standards-library.genericErrorResponse]
+        responses:
+          200:
+            description: Returns Member Details if a Member is Eligible
+            body: 
+              type: !include data-types/get-eligible-accounts-response.raml
+              example: !include examples/get-eligible-accounts-response.json
+    
+         
+      /secondary-users:
+        get:
+          displayName: Open Banking Get Eligible Secondary Users
+          description: Retrieve Eligible Secondary Users for a Member's Accounts
+          is: [standards-library.clientIdEnforcement, standards-library.genericErrorResponse]
+          responses:
+            200:
+              description: Returns Member Details if a Member is Eligible
+              body: 
+                type: !include data-types/get-eligible-secondary-users-response.raml
+                example: !include examples/get-eligible-secondary-users-response.json
+      /business-representatives:
+        get:
+          queryParameters:
+            personal-member-id:
+              type: string
+              example: "12345"
+              description: personal member id to limit accounts owned where the member has control off
+          displayName: Open Banking Get Eligible Business Representatives for a Business
+          description: Retrieve Eligible Business Representatives for a Business
+          is: [standards-library.clientIdEnforcement, standards-library.genericErrorResponse]
+          responses:
+            200:
+              description: Returns Member Details if a Member is Eligible
+              body: 
+                type: !include data-types/get-eligible-business-representatives-response.raml
+                example: !include examples/get-eligible-business-representatives-response.json
